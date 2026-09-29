@@ -1,14 +1,15 @@
 import csv
 import os
+import random
 from datetime import date
 
 
 # --------------------------------------------------
-# Read CSV file
+# Read GDC CSV file
 # --------------------------------------------------
 
 def read_csv_file(file_path):
-    """Read data from a CSV file and return it as a list of dictionaries."""
+    """Read GDC data from CSV file."""
 
     if not os.path.exists(file_path):
         print(f"File not found: {file_path}")
@@ -20,169 +21,320 @@ def read_csv_file(file_path):
 
 
 # --------------------------------------------------
-# Calculate GDC metrics
+# Greeting
 # --------------------------------------------------
 
-def calculate_metrics(quotes, tenders, approvals, failures, closed_deals):
-    """Calculate daily GDC operational metrics."""
+def get_greeting():
+    """Return a friendly greeting."""
 
-    metrics = {
-        "quotes_created": len(quotes),
-        "active_tenders": len(tenders),
-        "pending_approvals": len(approvals),
-        "failed_transactions": len(failures),
-        "closed_deals": len(closed_deals),
-        "closed_deal_value": 0,
-        "pipeline_value": 0
-    }
+    greetings = [
+        "Hello! 👋 How can I help you with GDC data today?",
+        "Hi! 😊 Hope you're having a great day. How can I assist you?",
+        "Hello! 🌟 Ready to help you with your GDC data.",
+        "Hi there! Have a productive day! How can I help you today?",
+        "Hello! ☀️ Wishing you a great day ahead. What GDC details would you like to know?"
+    ]
 
-    # Calculate closed deal value
-    for deal in closed_deals:
-        try:
-            value = float(deal.get("deal_value", 0) or 0)
-            metrics["closed_deal_value"] += value
-        except ValueError:
-            pass
-
-    # Calculate pipeline value
-    for quote in quotes:
-        try:
-            value = float(quote.get("deal_value", 0) or 0)
-            metrics["pipeline_value"] += value
-        except ValueError:
-            pass
-
-    return metrics
+    return random.choice(greetings)
 
 
 # --------------------------------------------------
-# Generate daily summary
+# Display quote details
 # --------------------------------------------------
 
-def generate_daily_summary(metrics):
+def display_quotes(quotes, title):
+    """Display quote details in a readable format."""
 
-    summary = f"""
-========================================
-        GDC DAILY SUMMARY
-========================================
+    print("\n" + "=" * 70)
+    print(title)
+    print("=" * 70)
 
-Date: {date.today().strftime("%d-%m-%Y")}
+    if not quotes:
+        print("\nNo matching quotes were found.")
+        return
 
-----------------------------------------
-DEAL ACTIVITY
-----------------------------------------
+    print(f"\nTotal records found: {len(quotes)}\n")
 
-Quotes Created       : {metrics["quotes_created"]}
-Active Tenders       : {metrics["active_tenders"]}
-Pending Approvals    : {metrics["pending_approvals"]}
-Failed Transactions  : {metrics["failed_transactions"]}
-Closed Deals         : {metrics["closed_deals"]}
+    for index, quote in enumerate(quotes, start=1):
 
-----------------------------------------
-FINANCIAL OVERVIEW
-----------------------------------------
-
-Closed Deal Value    : ${metrics["closed_deal_value"]:,.2f}
-Pipeline Value       : ${metrics["pipeline_value"]:,.2f}
-
-----------------------------------------
-OPERATIONAL INSIGHTS
-----------------------------------------
-"""
-
-    # Pending approvals
-    if metrics["pending_approvals"] > 0:
-        summary += (
-            f"\n- {metrics['pending_approvals']} deal(s) "
-            "are currently pending approval."
-        )
-    else:
-        summary += "\n- No pending approvals."
-
-    # Failed transactions
-    if metrics["failed_transactions"] > 0:
-        summary += (
-            f"\n- {metrics['failed_transactions']} "
-            "failed transaction(s) require investigation."
-        )
-    else:
-        summary += "\n- No failed transactions identified."
-
-    # Quotes
-    if metrics["quotes_created"] > 0:
-        summary += (
-            f"\n- {metrics['quotes_created']} new quote(s) "
-            "were created."
-        )
-    else:
-        summary += "\n- No new quotes were created."
-
-    # Tenders
-    if metrics["active_tenders"] > 0:
-        summary += (
-            f"\n- {metrics['active_tenders']} "
-            "tender(s) are currently active."
-        )
-    else:
-        summary += "\n- No active tenders identified."
-
-    # Closed deals
-    if metrics["closed_deals"] > 0:
-        summary += (
-            f"\n- {metrics['closed_deals']} deal(s) were closed "
-            f"with a total value of "
-            f"${metrics['closed_deal_value']:,.2f}."
-        )
-    else:
-        summary += "\n- No deals were closed."
-
-    summary += """
-
-========================================
-       END OF DAILY SUMMARY
-========================================
-"""
-
-    return summary
+        print(f"Quote {index}")
+        print(f"  Quote Number    : {quote.get('Quote_Number', '')}")
+        print(f"  Name            : {quote.get('Name', '')}")
+        print(f"  Quote Status    : {quote.get('Quote_Status', '')}")
+        print(f"  Approval Status : {quote.get('Approval_Status', '')}")
+        print("-" * 70)
 
 
 # --------------------------------------------------
-# Main program
+# Approved quotes
+# --------------------------------------------------
+
+def get_approved_quotes(data):
+    """Return quotes with Approved approval status."""
+
+    approved_quotes = []
+
+    for row in data:
+
+        approval_status = (
+            row.get("Approval_Status", "")
+            .strip()
+            .lower()
+        )
+
+        if approval_status == "approved":
+            approved_quotes.append(row)
+
+    return approved_quotes
+
+
+# --------------------------------------------------
+# Pending approval quotes
+# --------------------------------------------------
+
+def get_pending_quotes(data):
+    """Return quotes that are pending approval."""
+
+    pending_quotes = []
+
+    for row in data:
+
+        approval_status = (
+            row.get("Approval_Status", "")
+            .strip()
+            .lower()
+        )
+
+        if approval_status in [
+            "pending",
+            "pending approval",
+            "awaiting approval"
+        ]:
+            pending_quotes.append(row)
+
+    return pending_quotes
+
+
+# --------------------------------------------------
+# Completed deals
+# --------------------------------------------------
+
+def get_completed_deals(data):
+    """Return completed deals."""
+
+    completed_deals = []
+
+    for row in data:
+
+        quote_status = (
+            row.get("Quote_Status", "")
+            .strip()
+            .lower()
+        )
+
+        if quote_status == "completed":
+            completed_deals.append(row)
+
+    return completed_deals
+
+
+# --------------------------------------------------
+# Process user question
+# --------------------------------------------------
+
+def process_question(user_input, data):
+
+    question = user_input.lower().strip()
+
+    # ----------------------------------------------
+    # Approved quotes
+    # ----------------------------------------------
+
+    if (
+        "approved" in question
+        and "quote" in question
+    ):
+        approved_quotes = get_approved_quotes(data)
+
+        display_quotes(
+            approved_quotes,
+            "APPROVED QUOTES"
+        )
+
+        return
+
+    # ----------------------------------------------
+    # Pending approval quotes
+    # ----------------------------------------------
+
+    if (
+        "pending" in question
+        or "pending approval" in question
+    ):
+        pending_quotes = get_pending_quotes(data)
+
+        display_quotes(
+            pending_quotes,
+            "PENDING APPROVAL QUOTES"
+        )
+
+        return
+
+    # ----------------------------------------------
+    # Completed deals
+    # ----------------------------------------------
+
+    if (
+        "completed" in question
+        and "deal" in question
+    ):
+        completed_deals = get_completed_deals(data)
+
+        display_quotes(
+            completed_deals,
+            "COMPLETED DEALS"
+        )
+
+        return
+
+    # Also understand "completed quotes"
+    if "completed" in question:
+        completed_deals = get_completed_deals(data)
+
+        display_quotes(
+            completed_deals,
+            "COMPLETED DEALS"
+        )
+
+        return
+
+    # ----------------------------------------------
+    # Help
+    # ----------------------------------------------
+
+    if "help" in question:
+
+        print("""
+I can help you with the following GDC information:
+
+1. Approved quotes
+2. Pending approval quotes
+3. Completed deals
+
+Example questions:
+
+- Show me approved quotes
+- Give me pending approval quotes
+- Show completed deals
+""")
+
+        return
+
+    # ----------------------------------------------
+    # Unknown question
+    # ----------------------------------------------
+
+    print("""
+I can currently help you with:
+
+- Approved quotes
+- Pending approval quotes
+- Completed deals
+
+Try asking something like:
+"Show me approved quotes"
+""")
+
+
+# --------------------------------------------------
+# Main chatbot
 # --------------------------------------------------
 
 def main():
 
-    # Folder containing GDC CSV files
-    data_folder = "data"
+    # ----------------------------------------------
+    # GDC CSV file path
+    # ----------------------------------------------
 
-    # CSV file locations
-    quotes_file = os.path.join(data_folder, "quotes.csv")
-    tenders_file = os.path.join(data_folder, "tenders.csv")
-    approvals_file = os.path.join(data_folder, "approvals.csv")
-    failures_file = os.path.join(data_folder, "failures.csv")
-    closed_deals_file = os.path.join(data_folder, "closed_deals.csv")
-
-    # Read CSV files
-    quotes = read_csv_file(quotes_file)
-    tenders = read_csv_file(tenders_file)
-    approvals = read_csv_file(approvals_file)
-    failures = read_csv_file(failures_file)
-    closed_deals = read_csv_file(closed_deals_file)
-
-    # Calculate metrics
-    metrics = calculate_metrics(
-        quotes,
-        tenders,
-        approvals,
-        failures,
-        closed_deals
+    data_file = os.path.join(
+        "data",
+        "data",
+        "data.csv"
     )
 
-    # Generate summary
-    summary = generate_daily_summary(metrics)
+    # ----------------------------------------------
+    # Read GDC data
+    # ----------------------------------------------
 
-    # Display summary
-    print(summary)
+    data = read_csv_file(data_file)
+
+    if not data:
+        print("No GDC data found.")
+        return
+
+    # ----------------------------------------------
+    # Start bot
+    # ----------------------------------------------
+
+    print("=" * 70)
+    print("             GDC DAILY SUMMARY BOT")
+    print("=" * 70)
+
+    print("\nBot:", get_greeting())
+
+    print("""
+You can ask me about:
+
+- Approved quotes
+- Pending approval quotes
+- Completed deals
+
+Type 'exit' to close the bot.
+""")
+
+    # ----------------------------------------------
+    # Chat loop
+    # ----------------------------------------------
+
+    while True:
+
+        user_input = input("\nUser: ")
+
+        # Exit
+        if user_input.lower().strip() in [
+            "exit",
+            "quit",
+            "bye"
+        ]:
+
+            print(
+                "\nBot: Goodbye! 👋 "
+                "Have a great day!"
+            )
+
+            break
+
+        # Greeting
+        if user_input.lower().strip() in [
+            "hi",
+            "hello",
+            "hey",
+            "good morning",
+            "good afternoon",
+            "good evening"
+        ]:
+
+            print("\nBot:", get_greeting())
+
+            continue
+
+        # Process question
+        print("\nBot: Let me check the GDC data...")
+
+        process_question(
+            user_input,
+            data
+        )
 
 
 # --------------------------------------------------
